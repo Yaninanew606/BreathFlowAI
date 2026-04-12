@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BreathFlow</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f4f4f5;
+    --bg3: #ebebec;
+    --text: #111111;
+    --text2: #6b6b6b;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --info-bg: #e6f1fb;
+    --info-border: #85b7eb;
+    --info-text: #0c447c;
+    --warn-bg: #faeeda;
+    --warn-border: #ef9f27;
+    --warn-text: #633806;
+    --success-bg: #eaf3de;
+    --success-border: #97c459;
+    --success-text: #27500a;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e;
+      --bg2: #2c2c2e;
+      --bg3: #3a3a3c;
+      --text: #f2f2f7;
+      --text2: #8e8e93;
+      --border: rgba(255,255,255,0.12);
+      --border2: rgba(255,255,255,0.22);
+      --info-bg: #0c2f50;
+      --info-border: #378add;
+      --info-text: #b5d4f4;
+      --warn-bg: #3d2a00;
+      --warn-border: #ba7517;
+      --warn-text: #fac775;
+      --success-bg: #1a2e08;
+      --success-border: #639922;
+      --success-text: #c0dd97;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 1rem 2rem;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+  .screen.active { display: flex; }
+
+  /* Buttons */
+  button {
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button:active { transform: scale(0.96); }
+  button.primary {
+    background: var(--text);
+    color: var(--bg);
+    border-color: transparent;
+  }
+  button.primary:active { opacity: 0.8; }
+  button.ghost {
+    border-color: transparent;
+    color: var(--text2);
+    font-size: 13px;
+    padding: 7px 12px;
+  }
+  button.sm { padding: 8px 14px; font-size: 13px; }
+
+  /* Top nav */
+  .topnav {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+  .app-title { font-size: 18px; font-weight: 600; color: var(--text); }
+  .nav-btns { display: flex; gap: 4px; }
+
+  /* Section label */
+  .slbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  /* Mode cards */
+  .mc {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    width: 100%;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .mc:active { background: var(--bg3); }
+  .mc.sel {
+    border-color: var(--text);
+    background: var(--bg2);
+  }
+  .mc-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+  .mc-body { font-size: 13px; color: var(--text2); line-height: 1.55; }
+  .mc-tags { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    background: var(--bg3);
+    color: var(--text2);
+    border: 0.5px solid var(--border);
+  }
+
+  /* Safety note */
+  .safety {
+    font-size: 12px;
+    color: var(--text2);
+    text-align: center;
+    margin-top: 0.75rem;
+    line-height: 1.6;
+  }
+
+  /* Session */
+  .sess-top {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 1.5rem;
+  }
+  .sess-top strong { font-weight: 600; color: var(--text); }
+
+  #sphere-wrap {
+    position: relative;
+    width: min(240px, 62vw);
+    height: min(240px, 62vw);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  #sphere-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 0.5px solid var(--border);
+  }
+  #sphere {
+    width: 48%;
+    height: 48%;
+    border-radius: 50%;
+    background: var(--bg2);
+    border: 1.5px solid var(--border2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    transition: background 0.5s, border-color 0.5s;
+  }
+  #phase-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  #phase-count {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    min-height: 34px;
+    line-height: 1;
+    margin-top: 3px;
+  }
+
+  #progress-wrap {
+    width: 100%;
+    height: 3px;
+    background: var(--bg2);
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%;
+    background: var(--text2);
+    border-radius: 2px;
+    width: 0%;
+  }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
+  .btn-sub { display: flex; gap: 8px; justify-content: center; }
+
+  /* Settings */
+  .srow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text2);
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  .srow label { flex: 0 0 115px; }
+  .srow input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    outline: none;
+  }
+  .srow input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+  }
+  .srow .val { font-weight: 600; color: var(--text); min-width: 28px; text-align: right; }
+  .divider { width: 100%; height: 0.5px; background: var(--border); margin: 1rem 0; }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 10px;
+  }
+  .toggle-row input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--text); }
+
+  /* Stats */
+  .sgrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin: 1rem 0;
+  }
+  .sc {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+  }
+  .sv { font-size: 22px; font-weight: 600; color: var(--text); }
+  .sl { font-size: 11px; color: var(--text2); margin-top: 3px; }
+
+  /* History */
+  .hi {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 0;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 13px;
+  }
+  .hi-left { color: var(--text2); }
+  .hi-right { font-weight: 600; color: var(--text); text-align: right; }
+  .hi-mode { font-size: 11px; margin-top: 2px; }
+
+  /* Back row */
+  .back-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .back-row .page-title { font-size: 16px; font-weight: 600; color: var(--text); }
+
+  .complete-title { font-size: 21px; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; text-align: center; }
+  .complete-sub { font-size: 13px; color: var(--text2); margin-bottom: 1.25rem; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div id="sc-home" class="screen active">
+    <div class="topnav">
+      <div class="app-title">BreathFlow</div>
+      <div class="nav-btns">
+        <button class="ghost" onclick="go('history')">История</button>
+        <button class="ghost" onclick="go('settings')">Настройки</button>
+      </div>
+    </div>
+    <div class="slbl">Режим дыхания</div>
+    <div class="mc sel" id="mc-wim" onclick="pick('wim')">
+      <div class="mc-title">Метод Вима Хофа</div>
+      <div class="mc-body">Насыщает кровь кислородом, вызывает выброс адреналина и эндорфинов. Укрепляет иммунитет, заряжает энергией и улучшает концентрацию. Лучше всего подходит для утра.</div>
+      <div class="mc-tags"><span class="tag">Энергия</span><span class="tag">Иммунитет</span><span class="tag">Концентрация</span></div>
+    </div>
+    <div class="mc" id="mc-box" onclick="pick('box')">
+      <div class="mc-title">Box breathing 4-4-4-4</div>
+      <div class="mc-body">Активирует парасимпатическую нервную систему. Снижает кортизол, нормализует давление и пульс. Применяется спецназом для управления стрессом в бою.</div>
+      <div class="mc-tags"><span class="tag">Стресс</span><span class="tag">Давление</span><span class="tag">Фокус</span></div>
+    </div>
+    <div class="mc" id="mc-478" onclick="pick('478')">
+      <div class="mc-title">Метод 4-7-8</div>
+      <div class="mc-body">Переводит нервную систему в режим отдыха за считанные минуты. Снижает тревожность и помогает при бессоннице. Эффект ощущается уже после 2–3 циклов.</div>
+      <div class="mc-tags"><span class="tag">Сон</span><span class="tag">Тревога</span><span class="tag">Расслабление</span></div>
+    </div>
+    <div style="width:100%;margin-top:.85rem">
+      <button class="primary" onclick="startSession()" style="width:100%;padding:13px;font-size:15px;font-weight:600">Начать практику</button>
+      <p class="safety">Не выполняйте в воде, за рулём или в ванной</p>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="sc-settings" class="screen">
+    <div class="back-row">
+      <button class="ghost" onclick="go('home')" style="padding:7px 11px;font-size:16px">&#8592;</button>
+      <div class="page-title">Настройки</div>
+    </div>
+    <div class="slbl">Параметры дыхания</div>
+    <div class="srow"><label>Вдох (сек)</label><input type="range" id="s-inhale" min="2" max="8" step="1" value="2" oninput="us('inhale',this.value)"><span class="val" id="v-inhale">2</span></div>
+    <div class="srow"><label>Выдох (сек)</label><input type="range" id="s-exhale" min="2" max="8" step="1" value="2" oninput="us('exhale',this.value)"><span class="val" id="v-exhale">2</span></div>
+    <div class="srow"><label>Циклов</label><input type="range" id="s-cycles" min="10" max="40" step="5" value="30" oninput="us('cycles',this.value)"><span class="val" id="v-cycles">30</span></div>
+    <div class="srow"><label>Раундов</label><input type="range" id="s-rounds" min="1" max="5" step="1" value="3" oninput="us('rounds',this.value)"><span class="val" id="v-rounds">3</span></div>
+    <div class="divider"></div>
+    <div class="slbl">Звук и обратная связь</div>
+    <div class="toggle-row">
+      <span>Звуковые сигналы</span>
+      <input type="checkbox" id="sound-cb" checked onchange="cfg.sound=this.checked">
+    </div>
+    <div class="toggle-row">
+      <span>Вибрация (haptic)</span>
+      <input type="checkbox" id="haptic-cb" checked onchange="cfg.haptic=this.checked">
+    </div>
+    <button class="primary" onclick="saveSettings()" style="width:100%;margin-top:1.25rem;padding:12px;font-weight:600">Сохранить</button>
+  </div>
+
+  <!-- SESSION -->
+  <div id="sc-session" class="screen">
+    <div class="sess-top">
+      <div>Раунд <strong id="rn">1</strong> / <strong id="rt">3</strong></div>
+      <div>Цикл <strong id="cn">0</strong> / <strong id="ct">30</strong></div>
+    </div>
+    <div id="sphere-wrap">
+      <div id="sphere-ring"></div>
+      <div id="sphere">
+        <div id="phase-label">старт</div>
+        <div id="phase-count"></div>
+      </div>
+    </div>
+    <div id="progress-wrap"><div id="progress-bar"></div></div>
+    <div class="btn-row">
+      <button id="btn-pause" onclick="pauseSession()">Пауза</button>
+      <button id="btn-early" onclick="skipHold()" class="sm" style="display:none">Вдохнул раньше</button>
+    </div>
+    <div class="btn-sub">
+      <button class="ghost" id="snd-btn" onclick="toggleSound()">Звук: вкл</button>
+      <button class="ghost" onclick="abortSession()">Выйти</button>
+    </div>
+  </div>
+
+  <!-- COMPLETE -->
+  <div id="sc-complete" class="screen">
+    <div class="complete-title">Практика завершена</div>
+    <div class="complete-sub">Тело насыщено кислородом. Хорошая работа.</div>
+    <div class="sgrid">
+      <div class="sc"><div class="sv" id="cr">3</div><div class="sl">раунда</div></div>
+      <div class="sc"><div class="sv" id="ct2">—</div><div class="sl">минут</div></div>
+      <div class="sc"><div class="sv" id="ch">—</div><div class="sl">задержка</div></div>
+    </div>
+    <div class="btn-row" style="margin-top:.75rem;width:100%;flex-direction:column;gap:8px">
+      <button class="primary" onclick="restartSession()" style="width:100%;padding:12px;font-weight:600">Ещё раз</button>
+      <button onclick="go('home')" style="width:100%;padding:12px">На главную</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="sc-history" class="screen">
+    <div class="back-row">
+      <button class="ghost" onclick="go('home')" style="padding:7px 11px;font-size:16px">&#8592;</button>
+      <div class="page-title">История сессий</div>
+    </div>
+    <div id="hlist" style="width:100%">
+      <p style="font-size:13px;color:var(--text2);text-align:center;padding:2.5rem 0">Сессий пока нет</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Telegram WebApp init ─────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.disableVerticalSwipes?.();
+  // Применяем цвета темы Telegram если есть
+  if (tg.colorScheme === 'dark') {
+    document.documentElement.style.setProperty('--bg', tg.themeParams?.bg_color || '#1c1c1e');
+    document.documentElement.style.setProperty('--text', tg.themeParams?.text_color || '#f2f2f7');
+    document.documentElement.style.setProperty('--bg2', tg.themeParams?.secondary_bg_color || '#2c2c2e');
+  }
+}
+
+function haptic(type = 'light') {
+  if (!cfg.haptic) return;
+  try {
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred(type); // 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
+    } else if (navigator.vibrate) {
+      const ms = { light: 20, medium: 40, heavy: 80 };
+      navigator.vibrate(ms[type] || 20);
+    }
+  } catch(e) {}
+}
+
+function hapticNotif(type = 'success') {
+  if (!cfg.haptic) return;
+  try {
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.notificationOccurred(type); // 'success' | 'warning' | 'error'
+    }
+  } catch(e) {}
+}
+
+// ─── CloudStorage ─────────────────────────────────────────────────────────────
+function cloudSave(key, value) {
+  try { tg?.CloudStorage?.setItem(key, JSON.stringify(value)); } catch(e) {}
+}
+
+function cloudLoad(key, cb) {
+  try {
+    tg?.CloudStorage?.getItem(key, (err, val) => {
+      if (!err && val) cb(JSON.parse(val));
+    });
+  } catch(e) {}
+}
+
+// Загрузка настроек из CloudStorage при старте
+cloudLoad('bf_cfg', saved => {
+  Object.assign(cfg, saved);
+  applySettingsToUI();
+});
+
+cloudLoad('bf_hist', saved => {
+  if (Array.isArray(saved)) {
+    saved.forEach(h => { h.date = new Date(h.date); hist.push(h); });
+  }
+});
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const cfg = { inhale: 2, exhale: 2, cycles: 30, rounds: 3, sound: true, haptic: true };
+let mode = 'wim';
+let curPhase = null, phaseDur = null, phaseStart = null, raf = null;
+let round = 0, cycle = 0, sessStart = null, maxHold = 0;
+let paused = false, pausedAt = null, audioCtx = null;
+const hist = [];
+
+const sph = document.getElementById('sphere');
+const pl  = document.getElementById('phase-label');
+const pc  = document.getElementById('phase-count');
+const pb  = document.getElementById('progress-bar');
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function go(s) {
+  document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
+  document.getElementById('sc-' + s).classList.add('active');
+  if (s === 'history') renderHist();
+  // Показываем кнопку закрытия в Telegram на главной
+  if (tg) {
+    if (s === 'home') tg.MainButton?.hide();
+    tg.BackButton?.[s === 'home' ? 'hide' : 'show']();
+  }
+}
+
+// Кнопка "назад" в Telegram
+tg?.BackButton?.onClick(() => {
+  const active = document.querySelector('.screen.active')?.id;
+  if (active && active !== 'sc-home') {
+    if (active === 'sc-session') abortSession();
+    else go('home');
+  }
+});
+
+// ─── Mode selection ───────────────────────────────────────────────────────────
+function pick(m) {
+  mode = m;
+  ['wim','box','478'].forEach(k => document.getElementById('mc-' + k).classList.toggle('sel', k === m));
+  if (m === 'box') { cfg.inhale = 4; cfg.exhale = 4; syncSliders(); }
+  if (m === '478') { cfg.inhale = 4; cfg.exhale = 8; syncSliders(); }
+  haptic('light');
+}
+
+function syncSliders() {
+  ['inhale','exhale'].forEach(k => {
+    document.getElementById('s-' + k).value = cfg[k];
+    document.getElementById('v-' + k).textContent = cfg[k];
+  });
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+function us(k, v) {
+  cfg[k] = parseInt(v);
+  document.getElementById('v-' + k).textContent = v;
+  if (k === 'cycles') document.getElementById('ct').textContent = v;
+}
+
+function applySettingsToUI() {
+  ['inhale','exhale','cycles','rounds'].forEach(k => {
+    const el = document.getElementById('s-' + k);
+    if (el) el.value = cfg[k];
+    const vel = document.getElementById('v-' + k);
+    if (vel) vel.textContent = cfg[k];
+  });
+  const scb = document.getElementById('sound-cb');
+  if (scb) scb.checked = cfg.sound;
+  const hcb = document.getElementById('haptic-cb');
+  if (hcb) hcb.checked = cfg.haptic;
+}
+
+function saveSettings() {
+  cloudSave('bf_cfg', cfg);
+  haptic('medium');
+  go('home');
+}
+
+// ─── Audio ────────────────────────────────────────────────────────────────────
+function initAudio() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+}
+
+function tone(freq, dur, vol = 0.15) {
+  if (!cfg.sound || !audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.03);
+    g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + dur + 0.05);
+  } catch(e) {}
+}
+
+// ─── Animation ────────────────────────────────────────────────────────────────
+function eio(t) { return t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t; }
+
+const phaseConfig = {
+  inhale:     { label: 'вдох',           bg: 'var(--info-bg)',    border: 'var(--info-border)',    color: 'var(--info-text)',    earlyBtn: false, sound: () => tone(528, .25, .12),  hapticFn: () => haptic('light') },
+  exhale:     { label: 'выдох',          bg: 'var(--bg2)',        border: 'var(--border2)',         color: 'var(--text)',         earlyBtn: false, sound: () => tone(396, .25, .12),  hapticFn: () => haptic('light') },
+  exhaleHold: { label: 'задержка',       bg: 'var(--warn-bg)',   border: 'var(--warn-border)',    color: 'var(--warn-text)',    earlyBtn: true,  sound: () => { tone(528,.3,.18); setTimeout(()=>tone(660,.3,.15),180); }, hapticFn: () => haptic('heavy') },
+  inhaleHold: { label: 'вдох + задержка',bg: 'var(--success-bg)',border: 'var(--success-border)', color: 'var(--success-text)', earlyBtn: false, sound: () => tone(432, 1, .2),     hapticFn: () => hapticNotif('success') },
+  boxHoldIn:  { label: 'задержка',       bg: 'var(--info-bg)',   border: 'var(--info-border)',    color: 'var(--info-text)',    earlyBtn: false, sound: () => { tone(528,.3,.18); setTimeout(()=>tone(660,.3,.15),180); }, hapticFn: () => haptic('medium') },
+  boxHoldOut: { label: 'задержка',       bg: 'var(--warn-bg)',   border: 'var(--warn-border)',    color: 'var(--warn-text)',    earlyBtn: false, sound: () => { tone(528,.3,.18); setTimeout(()=>tone(660,.3,.15),180); }, hapticFn: () => haptic('medium') },
+  '478hold':  { label: 'задержка',       bg: 'var(--warn-bg)',   border: 'var(--warn-border)',    color: 'var(--warn-text)',    earlyBtn: false, sound: () => { tone(528,.3,.18); setTimeout(()=>tone(660,.3,.15),180); }, hapticFn: () => haptic('medium') },
+};
+
+function setPhase(ph, dur) {
+  curPhase = ph; phaseDur = dur * 1000; phaseStart = performance.now();
+  const c = phaseConfig[ph]; if (!c) return;
+  pl.textContent = c.label;
+  sph.style.background = c.bg;
+  sph.style.borderColor = c.border;
+  pc.style.color = c.color;
+  document.getElementById('btn-early').style.display = c.earlyBtn ? 'inline-block' : 'none';
+  c.sound();
+  c.hapticFn();
+  if (raf) cancelAnimationFrame(raf);
+  tick();
+}
+
+function tick() {
+  if (paused) return;
+  const now = performance.now(), el = now - phaseStart, t = Math.min(el / phaseDur, 1);
+  const secs = Math.ceil(Math.max(0, (phaseDur - el) / 1000));
+  let sc = 1;
+  if (curPhase === 'inhale') { sc = 1 + .85 * eio(t); pb.style.width = ((cycle / cfg.cycles) * 100).toFixed(1) + '%'; }
+  else if (curPhase === 'exhale') { sc = 1.85 - .85 * eio(t); pb.style.width = (((cycle - .5) / cfg.cycles) * 100).toFixed(1) + '%'; }
+  else if (curPhase === 'inhaleHold' || curPhase === 'boxHoldIn') sc = 1.85;
+  sph.style.transform = 'scale(' + sc.toFixed(3) + ')';
+  pc.textContent = secs > 0 ? secs : '';
+  if (t < 1) { raf = requestAnimationFrame(tick); } else next();
+}
+
+// ─── Phase transitions ────────────────────────────────────────────────────────
+function next() {
+  if (mode === 'wim') {
+    if (curPhase === 'inhale') setPhase('exhale', cfg.exhale);
+    else if (curPhase === 'exhale') {
+      cycle++; document.getElementById('cn').textContent = cycle;
+      if (cycle >= cfg.cycles) {
+        const hd = [30, 60, 90, 120, 150][round - 1] || 30;
+        if (hd > maxHold) maxHold = hd;
+        setPhase('exhaleHold', hd);
+      } else setPhase('inhale', cfg.inhale);
+    }
+    else if (curPhase === 'exhaleHold') setPhase('inhaleHold', 15);
+    else if (curPhase === 'inhaleHold') { if (round >= cfg.rounds) finish(); else startRound(); }
+  } else if (mode === 'box') {
+    if (curPhase === 'inhale') setPhase('boxHoldIn', 4);
+    else if (curPhase === 'boxHoldIn') setPhase('exhale', 4);
+    else if (curPhase === 'exhale') setPhase('boxHoldOut', 4);
+    else if (curPhase === 'boxHoldOut') {
+      cycle++; document.getElementById('cn').textContent = cycle;
+      if (cycle >= cfg.cycles) { if (round >= cfg.rounds) finish(); else startRound(); }
+      else setPhase('inhale', 4);
+    }
+  } else if (mode === '478') {
+    if (curPhase === 'inhale') setPhase('478hold', 7);
+    else if (curPhase === '478hold') setPhase('exhale', 8);
+    else if (curPhase === 'exhale') {
+      cycle++; document.getElementById('cn').textContent = cycle;
+      if (cycle >= cfg.cycles) { if (round >= cfg.rounds) finish(); else startRound(); }
+      else setPhase('inhale', 4);
+    }
+  }
+}
+
+// ─── Session control ──────────────────────────────────────────────────────────
+function startRound() {
+  round++; cycle = 0;
+  document.getElementById('rn').textContent = round;
+  document.getElementById('cn').textContent = 0;
+  pb.style.width = '0%';
+  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); }
+  setPhase('inhale', mode === 'wim' ? cfg.inhale : 4);
+}
+
+function startSession() {
+  initAudio();
+  document.getElementById('rt').textContent = cfg.rounds;
+  document.getElementById('ct').textContent = cfg.cycles;
+  document.getElementById('btn-pause').textContent = 'Пауза';
+  document.getElementById('snd-btn').textContent = 'Звук: ' + (cfg.sound ? 'вкл' : 'выкл');
+  round = 0; cycle = 0; sessStart = Date.now(); maxHold = 0; paused = false;
+  sph.style.transform = 'scale(1)';
+  haptic('medium');
+  go('session');
+  startRound();
+}
+
+function pauseSession() {
+  if (!paused) {
+    paused = true; pausedAt = performance.now();
+    if (raf) cancelAnimationFrame(raf);
+    document.getElementById('btn-pause').textContent = 'Продолжить';
+    haptic('light');
+  } else {
+    paused = false; phaseStart += (performance.now() - pausedAt);
+    document.getElementById('btn-pause').textContent = 'Пауза';
+    haptic('light');
+    tick();
+  }
+}
+
+function skipHold() { phaseDur = 0; }
+
+function abortSession() {
+  if (raf) cancelAnimationFrame(raf);
+  resetSph(); go('home');
+}
+
+function finish() {
+  if (raf) cancelAnimationFrame(raf);
+  [0, 280, 560].forEach(d => setTimeout(() => tone(528 + d, .45, .15), d));
+  hapticNotif('success');
+  resetSph();
+  const el = Math.max(1, Math.round((Date.now() - sessStart) / 60000));
+  document.getElementById('cr').textContent = cfg.rounds;
+  document.getElementById('ct2').textContent = el;
+  document.getElementById('ch').textContent = maxHold ? maxHold + 'с' : '—';
+  const mn = { wim: 'Метод Вима', box: 'Box 4-4-4-4', '478': '4-7-8' };
+  const entry = { date: new Date(), rounds: cfg.rounds, time: el, hold: maxHold, mode: mn[mode] };
+  hist.unshift(entry);
+  // Сохраняем историю в CloudStorage (максимум 20 записей)
+  cloudSave('bf_hist', hist.slice(0, 20).map(h => ({ ...h, date: h.date.toISOString() })));
+  go('complete');
+}
+
+function restartSession() {
+  round = 0; cycle = 0; sessStart = Date.now(); maxHold = 0; paused = false;
+  document.getElementById('btn-pause').textContent = 'Пауза';
+  sph.style.transform = 'scale(1)';
+  go('session'); startRound();
+}
+
+function resetSph() {
+  sph.style.transform = 'scale(1)';
+  sph.style.background = 'var(--bg2)';
+  sph.style.borderColor = 'var(--border2)';
+  pl.textContent = 'старт'; pc.textContent = ''; pb.style.width = '0%';
+}
+
+function toggleSound() {
+  cfg.sound = !cfg.sound;
+  document.getElementById('snd-btn').textContent = 'Звук: ' + (cfg.sound ? 'вкл' : 'выкл');
+  document.getElementById('sound-cb').checked = cfg.sound;
+  if (cfg.sound && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  haptic('light');
+}
+
+function renderHist() {
+  const el = document.getElementById('hlist');
+  if (!hist.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text2);text-align:center;padding:2.5rem 0">Сессий пока нет</p>';
+    return;
+  }
+  el.innerHTML = hist.slice(0, 15).map(h => {
+    const d = h.date;
+    const ds = d.getDate() + '.' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    return `<div class="hi">
+      <div class="hi-left">${ds}<div class="hi-mode">${h.mode}</div></div>
+      <div class="hi-right">${h.rounds} р · ${h.time} мин · ${h.hold}с</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
