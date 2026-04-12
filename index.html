@@ -350,6 +350,50 @@
 
   .complete-title { font-size: 21px; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; text-align: center; }
   .complete-sub { font-size: 13px; color: var(--text2); margin-bottom: 1.25rem; text-align: center; }
+
+  /* Frequency pills */
+  .freq-pills {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .freq-pill {
+    padding: 7px 13px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg2);
+    color: var(--text2);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-user-select: none;
+    user-select: none;
+    font-family: inherit;
+  }
+  .freq-pill:active { transform: scale(0.95); }
+  .freq-pill.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: transparent;
+  }
+  .hint {
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+  .sess-sound-badge {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    margin-bottom: 0.5rem;
+  }
+  .sess-sound-badge .tag { font-size: 10px; }
 </style>
 </head>
 <body>
@@ -409,6 +453,23 @@
       <input type="checkbox" id="haptic-cb" checked onchange="cfg.haptic=this.checked">
       <div class="toggle-switch"></div>
     </label>
+    <div class="divider"></div>
+    <div class="slbl">Фоновый звук</div>
+    <div class="freq-pills" id="bg-pills">
+      <div class="freq-pill active" onclick="pickBg('none')">Тишина</div>
+      <div class="freq-pill" onclick="pickBg('432')">432 Hz</div>
+      <div class="freq-pill" onclick="pickBg('528')">528 Hz</div>
+    </div>
+    <div class="srow"><label>Громкость</label><input type="range" id="s-bgvol" min="5" max="80" step="5" value="25" oninput="cfg.bgVol=+this.value;document.getElementById('v-bgvol').textContent=this.value+'%';updateBgVolume()"><span class="val" id="v-bgvol">25%</span></div>
+    <div class="divider"></div>
+    <div class="slbl">Бинауральные ритмы</div>
+    <div class="hint">Работает только в наушниках. Два слегка различных тона создают пульсацию в мозге.</div>
+    <div class="freq-pills" id="bin-pills">
+      <div class="freq-pill active" onclick="pickBin('none')">Выкл</div>
+      <div class="freq-pill" onclick="pickBin('alpha')">Alpha</div>
+      <div class="freq-pill" onclick="pickBin('theta')">Theta</div>
+      <div class="freq-pill" onclick="pickBin('schumann')">Schumann</div>
+    </div>
     <button class="primary" onclick="saveSettings()" style="width:100%;margin-top:1.25rem;padding:12px;font-weight:600">Сохранить</button>
   </div>
 
@@ -430,6 +491,7 @@
       <button id="btn-pause" onclick="pauseSession()">Пауза</button>
       <button id="btn-early" onclick="skipHold()" class="sm" style="display:none">Вдохнул раньше</button>
     </div>
+    <div id="sess-badges" class="sess-sound-badge"></div>
     <div class="btn-sub">
       <button class="ghost" id="snd-btn" onclick="toggleSound()">Звук: вкл</button>
       <button class="ghost" onclick="abortSession()">Выйти</button>
@@ -533,7 +595,7 @@ cloudLoad('bf_hist', saved => {
 });
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const cfg = { inhale: 2, exhale: 2, cycles: 30, rounds: 3, sound: true, haptic: true };
+const cfg = { inhale: 2, exhale: 2, cycles: 30, rounds: 3, sound: true, haptic: true, bgSound: 'none', binaural: 'none', bgVol: 25 };
 let mode = 'wim';
 let curPhase = null, phaseDur = null, phaseStart = null, raf = null;
 let round = 0, cycle = 0, sessStart = null, maxHold = 0;
@@ -600,6 +662,15 @@ function applySettingsToUI() {
   if (scb) scb.checked = cfg.sound;
   const hcb = document.getElementById('haptic-cb');
   if (hcb) hcb.checked = cfg.haptic;
+  // Background sound pills
+  const bgMap = ['none', '432', '528'];
+  document.querySelectorAll('#bg-pills .freq-pill').forEach((p, i) => p.classList.toggle('active', bgMap[i] === cfg.bgSound));
+  // Binaural pills
+  const binMap = ['none', 'alpha', 'theta', 'schumann'];
+  document.querySelectorAll('#bin-pills .freq-pill').forEach((p, i) => p.classList.toggle('active', binMap[i] === cfg.binaural));
+  // Volume
+  const volEl = document.getElementById('s-bgvol');
+  if (volEl) { volEl.value = cfg.bgVol; document.getElementById('v-bgvol').textContent = cfg.bgVol + '%'; }
 }
 
 function saveSettings() {
@@ -625,6 +696,123 @@ function tone(freq, dur, vol = 0.15) {
     g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + dur);
     o.start(); o.stop(audioCtx.currentTime + dur + 0.05);
   } catch(e) {}
+}
+
+// ─── Background Sound Engine ─────────────────────────────────────────────────
+let bgNodes = null; // { oscs: [], gains: [], master: GainNode }
+
+const binPresets = {
+  alpha:    { base: 200, beat: 10 },   // 200 & 210 Hz -> 10 Hz alpha
+  theta:    { base: 200, beat: 6 },    // 200 & 206 Hz -> 6 Hz theta
+  schumann: { base: 200, beat: 7.83 }, // 200 & 207.83 Hz -> 7.83 Hz
+};
+
+function startBgAudio() {
+  if (!audioCtx) return;
+  stopBgAudio();
+  if (cfg.bgSound === 'none' && cfg.binaural === 'none') return;
+
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0, audioCtx.currentTime);
+  master.gain.linearRampToValueAtTime(cfg.bgVol / 100 * 0.25, audioCtx.currentTime + 3);
+  master.connect(audioCtx.destination);
+
+  const oscs = [], gains = [];
+
+  // Pure tone background (432 or 528 Hz)
+  if (cfg.bgSound !== 'none') {
+    const freq = cfg.bgSound === '432' ? 432 : 528;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    g.gain.value = 1;
+    o.connect(g);
+    g.connect(master);
+    o.start();
+    oscs.push(o);
+    gains.push(g);
+  }
+
+  // Binaural beats (stereo)
+  if (cfg.binaural !== 'none') {
+    const p = binPresets[cfg.binaural];
+    if (p) {
+      const merger = audioCtx.createChannelMerger(2);
+
+      const oL = audioCtx.createOscillator();
+      const gL = audioCtx.createGain();
+      oL.type = 'sine';
+      oL.frequency.value = p.base;
+      gL.gain.value = 0.7;
+      oL.connect(gL);
+      gL.connect(merger, 0, 0); // left
+
+      const oR = audioCtx.createOscillator();
+      const gR = audioCtx.createGain();
+      oR.type = 'sine';
+      oR.frequency.value = p.base + p.beat;
+      gR.gain.value = 0.7;
+      oR.connect(gR);
+      gR.connect(merger, 0, 1); // right
+
+      merger.connect(master);
+      oL.start();
+      oR.start();
+      oscs.push(oL, oR);
+      gains.push(gL, gR);
+    }
+  }
+
+  bgNodes = { oscs, gains, master };
+  updateSessBadges();
+}
+
+function stopBgAudio() {
+  if (!bgNodes) return;
+  const t = audioCtx.currentTime;
+  bgNodes.master.gain.linearRampToValueAtTime(0, t + 1.5);
+  const nodes = bgNodes;
+  bgNodes = null;
+  setTimeout(() => {
+    nodes.oscs.forEach(o => { try { o.stop(); } catch(e) {} });
+    try { nodes.master.disconnect(); } catch(e) {}
+  }, 2000);
+}
+
+function updateBgVolume() {
+  if (bgNodes) {
+    bgNodes.master.gain.linearRampToValueAtTime(cfg.bgVol / 100 * 0.25, audioCtx.currentTime + 0.3);
+  }
+}
+
+function updateSessBadges() {
+  const el = document.getElementById('sess-badges');
+  if (!el) return;
+  const tags = [];
+  if (cfg.bgSound !== 'none') tags.push(cfg.bgSound + ' Hz');
+  if (cfg.binaural !== 'none') {
+    const names = { alpha: 'Alpha 10Hz', theta: 'Theta 6Hz', schumann: 'Schumann 7.83Hz' };
+    tags.push(names[cfg.binaural]);
+  }
+  el.innerHTML = tags.map(t => '<span class="tag">' + t + '</span>').join('');
+}
+
+// ─── Frequency pill selection ────────────────────────────────────────────────
+function pickBg(v) {
+  cfg.bgSound = v;
+  const pills = document.querySelectorAll('#bg-pills .freq-pill');
+  const map = ['none', '432', '528'];
+  pills.forEach((p, i) => p.classList.toggle('active', map[i] === v));
+  haptic('light');
+}
+
+function pickBin(v) {
+  cfg.binaural = v;
+  const pills = document.querySelectorAll('#bin-pills .freq-pill');
+  const map = ['none', 'alpha', 'theta', 'schumann'];
+  pills.forEach((p, i) => p.classList.toggle('active', map[i] === v));
+  haptic('light');
 }
 
 // ─── Animation ────────────────────────────────────────────────────────────────
@@ -721,6 +909,7 @@ function startSession() {
   sph.style.transform = 'scale(1)';
   haptic('medium');
   go('session');
+  startBgAudio();
   startRound();
 }
 
@@ -742,11 +931,13 @@ function skipHold() { phaseDur = 0; }
 
 function abortSession() {
   if (raf) cancelAnimationFrame(raf);
+  stopBgAudio();
   resetSph(); go('home');
 }
 
 function finish() {
   if (raf) cancelAnimationFrame(raf);
+  stopBgAudio();
   [0, 280, 560].forEach(d => setTimeout(() => tone(528 + d, .45, .15), d));
   hapticNotif('success');
   resetSph();
