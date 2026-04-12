@@ -273,8 +273,40 @@
     font-size: 13px;
     color: var(--text2);
     margin-bottom: 10px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
   }
-  .toggle-row input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--text); }
+  .toggle-row input[type=checkbox] { display: none; }
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 26px;
+    background: var(--bg3);
+    border-radius: 13px;
+    border: 0.5px solid var(--border);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text2);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-row input:checked + .toggle-switch {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+  }
+  .toggle-row input:checked + .toggle-switch::after {
+    transform: translateX(18px);
+    background: var(--success-border);
+  }
 
   /* Stats */
   .sgrid {
@@ -367,14 +399,16 @@
     <div class="srow"><label>Раундов</label><input type="range" id="s-rounds" min="1" max="5" step="1" value="3" oninput="us('rounds',this.value)"><span class="val" id="v-rounds">3</span></div>
     <div class="divider"></div>
     <div class="slbl">Звук и обратная связь</div>
-    <div class="toggle-row">
+    <label class="toggle-row">
       <span>Звуковые сигналы</span>
       <input type="checkbox" id="sound-cb" checked onchange="cfg.sound=this.checked">
-    </div>
-    <div class="toggle-row">
+      <div class="toggle-switch"></div>
+    </label>
+    <label class="toggle-row">
       <span>Вибрация (haptic)</span>
       <input type="checkbox" id="haptic-cb" checked onchange="cfg.haptic=this.checked">
-    </div>
+      <div class="toggle-switch"></div>
+    </label>
     <button class="primary" onclick="saveSettings()" style="width:100%;margin-top:1.25rem;padding:12px;font-weight:600">Сохранить</button>
   </div>
 
