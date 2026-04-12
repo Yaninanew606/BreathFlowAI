@@ -723,7 +723,7 @@ function createNoiseBuffer() {
 }
 
 function startBreathSound(type, duration) {
-  if (!cfg.breathSound || !audioCtx || !cfg.sound) return;
+  if (!cfg.breathSound || !audioCtx) return;
   stopBreathSound();
 
   const buf = createNoiseBuffer();
@@ -998,7 +998,7 @@ function startSession() {
   document.getElementById('rt').textContent = cfg.rounds;
   document.getElementById('ct').textContent = cfg.cycles;
   document.getElementById('btn-pause').textContent = 'Пауза';
-  document.getElementById('snd-btn').textContent = 'Звук: ' + (cfg.sound ? 'вкл' : 'выкл');
+  document.getElementById('snd-btn').textContent = 'Звук: ' + ((cfg.sound || cfg.breathSound) ? 'вкл' : 'выкл');
   round = 0; cycle = 0; sessStart = Date.now(); maxHold = 0; paused = false;
   sph.style.transform = 'scale(1)';
   haptic('medium');
@@ -1064,10 +1064,16 @@ function resetSph() {
 }
 
 function toggleSound() {
-  cfg.sound = !cfg.sound;
-  document.getElementById('snd-btn').textContent = 'Звук: ' + (cfg.sound ? 'вкл' : 'выкл');
+  // Переключаем оба звука вместе
+  const allOff = !cfg.sound && !cfg.breathSound;
+  cfg.sound = allOff ? true : !cfg.sound;
+  cfg.breathSound = allOff ? true : !cfg.breathSound;
+  const anyOn = cfg.sound || cfg.breathSound;
+  document.getElementById('snd-btn').textContent = 'Звук: ' + (anyOn ? 'вкл' : 'выкл');
   document.getElementById('sound-cb').checked = cfg.sound;
-  if (cfg.sound && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  document.getElementById('breath-cb').checked = cfg.breathSound;
+  if (anyOn && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  if (!cfg.breathSound) stopBreathSound();
   haptic('light');
 }
 
