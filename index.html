@@ -469,7 +469,7 @@
     </div>
     <div class="mc" id="mc-478" onclick="pick('478')">
       <div class="mc-content">
-        <div class="mc-title">Метод 4-7-8</div>
+        <div class="mc-title">Расслабляющее дыхание 4-7-8</div>
         <div class="mc-body">Переводит нервную систему в режим отдыха за считанные минуты. Снижает тревожность и помогает при бессоннице. Эффект ощущается уже после 2–3 циклов.</div>
         <div class="mc-tags"><span class="tag">Сон</span><span class="tag">Тревога</span><span class="tag">Расслабление</span></div>
       </div>
@@ -1106,7 +1106,7 @@ function finish() {
   document.getElementById('cr').textContent = cfg.rounds;
   document.getElementById('ct2').textContent = el;
   document.getElementById('ch').textContent = maxHold ? maxHold + 'с' : '—';
-  const mn = { wim: 'Метод Вима', box: 'Квадратное 4-4-4-4', '478': '4-7-8', buteyko: 'Бутейко' };
+  const mn = { wim: 'Метод Вима', box: 'Квадратное 4-4-4-4', '478': 'Расслабляющее 4-7-8', buteyko: 'Бутейко' };
   const entry = { date: new Date(), rounds: cfg.rounds, time: el, hold: maxHold, mode: mn[mode] };
   hist.unshift(entry);
   // Сохраняем историю в CloudStorage (максимум 20 записей)
