@@ -447,6 +447,16 @@
   }
   .sess-sound-badge .tag { font-size: 10px; }
 </style>
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=108515716','ym');
+ym(108515716,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBounce:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/108515716" style="position:absolute;left:-9999px;" alt=""/></div></noscript>
+<!-- /Yandex.Metrika counter -->
 </head>
 <body>
 <div id="app">
@@ -710,6 +720,7 @@ function pick(m) {
   if (m === 'box') { cfg.inhale = 4; cfg.exhale = 4; syncSliders(); }
   if (m === '478') { cfg.inhale = 4; cfg.exhale = 8; syncSliders(); }
   if (m === 'buteyko') { cfg.inhale = 2; cfg.exhale = 4; syncSliders(); }
+  ym(108515716, 'reachGoal', 'select_mode', { mode: m });
   haptic('light');
 }
 
@@ -1116,6 +1127,7 @@ function startSession() {
   round = 0; cycle = 0; sessStart = Date.now(); maxHold = 0; paused = false;
   sph.style.transform = 'scale(1)';
   haptic('medium');
+  ym(108515716, 'reachGoal', 'start_session', { mode: mode, rounds: cfg.rounds, cycles: cfg.cycles });
   go('session');
   startBgAudio();
   startRound();
@@ -1142,6 +1154,8 @@ function abortSession() {
   clearVoiceTimers();
   stopBreathSound();
   stopBgAudio();
+  const elapsed = sessStart ? Math.round((Date.now() - sessStart) / 1000) : 0;
+  ym(108515716, 'reachGoal', 'abort_session', { mode: mode, seconds: elapsed, round: round });
   resetSph(); go('home');
 }
 
@@ -1162,6 +1176,7 @@ function finish() {
   hist.unshift(entry);
   // Сохраняем историю в CloudStorage (максимум 20 записей)
   cloudSave('bf_hist', hist.slice(0, 20).map(h => ({ ...h, date: h.date.toISOString() })));
+  ym(108515716, 'reachGoal', 'finish_session', { mode: mode, minutes: el, rounds: cfg.rounds });
   go('complete');
 }
 
