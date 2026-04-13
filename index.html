@@ -553,6 +553,7 @@
       <div>Раунд <strong id="rn">1</strong> / <strong id="rt">3</strong></div>
       <div>Цикл <strong id="cn">0</strong> / <strong id="ct">30</strong></div>
     </div>
+    <div id="voice-hint" style="font-size:15px;font-weight:600;color:var(--text2);text-align:center;min-height:22px;transition:opacity 0.5s;opacity:0;margin-bottom:8px"></div>
     <div id="sphere-wrap">
       <div id="sphere-ring"></div>
       <div id="sphere">
@@ -856,10 +857,37 @@ function stopBreathSound() {
   } catch(e) { breathNodes = null; }
 }
 
-// ─── Voice Guide (placeholder — TODO) ────────────────────────────────────────
+// ─── Visual Guide (text hints on screen) ─────────────────────────────────────
+let guideTimer = null;
+
 function initVoice() {}
-function voicePhase() {}
-function clearVoiceTimers() {}
+
+function showGuide(text, duration) {
+  const el = document.getElementById('voice-hint');
+  if (!el) return;
+  el.textContent = text;
+  el.style.opacity = '1';
+  if (guideTimer) clearTimeout(guideTimer);
+  guideTimer = setTimeout(() => { el.style.opacity = '0'; }, duration || 2000);
+}
+
+function voicePhase(ph, dur) {
+  const labels = {
+    inhale: 'Вдох',
+    exhale: 'Выдох',
+    exhaleHold: 'Задержка — не дышите',
+    inhaleHold: 'Глубокий вдох и задержка',
+    boxHoldIn: 'Задержка',
+    boxHoldOut: 'Задержка',
+    '478hold': 'Задержка',
+  };
+  const label = labels[ph];
+  if (label) showGuide(label, Math.min(dur * 1000, 2500));
+}
+
+function clearVoiceTimers() {
+  if (guideTimer) { clearTimeout(guideTimer); guideTimer = null; }
+}
 
 // ─── Background Sound Engine ─────────────────────────────────────────────────
 let bgNodes = null; // { oscs: [], gains: [], master: GainNode }
@@ -1072,7 +1100,8 @@ function startRound() {
   document.getElementById('rn').textContent = round;
   document.getElementById('cn').textContent = 0;
   pb.style.width = '0%';
-  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); }
+  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); showGuide('Раунд ' + round); }
+  else { showGuide('Закройте глаза и дышите', 3000); }
   const firstInhale = mode === 'wim' ? cfg.inhale : mode === 'buteyko' ? 2 : 4;
   setPhase('inhale', firstInhale);
 }
