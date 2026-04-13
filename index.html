@@ -62,8 +62,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1.25rem 1rem 2rem;
-    padding-top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
+    padding: 0 1rem 2rem;
+    padding-top: calc(
+      var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))
+      + var(--tg-content-safe-area-inset-top, 0px)
+      + 12px
+    );
     max-width: 480px;
     margin: 0 auto;
     min-height: 100vh;
