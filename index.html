@@ -854,41 +854,63 @@ function stopBreathSound() {
 // ─── Voice Guide ─────────────────────────────────────────────────────────────
 let voiceTimers = [];
 let ruVoice = null;
+let voiceReady = false;
 
-// Ищем русский голос при загрузке
+const hasSpeech = typeof speechSynthesis !== 'undefined';
+
 function findRuVoice() {
-  if (ruVoice) return;
+  if (!hasSpeech) return;
   const voices = speechSynthesis.getVoices();
-  ruVoice = voices.find(v => v.lang.startsWith('ru')) || null;
+  // Предпочитаем женский русский голос
+  ruVoice = voices.find(v => v.lang === 'ru-RU')
+         || voices.find(v => v.lang.startsWith('ru'))
+         || null;
 }
-if (typeof speechSynthesis !== 'undefined') {
+if (hasSpeech) {
   speechSynthesis.onvoiceschanged = findRuVoice;
   findRuVoice();
 }
 
-function speak(text) {
-  if (!cfg.voice || typeof speechSynthesis === 'undefined') return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
+// Разблокировка Speech Synthesis по жесту пользователя
+function initVoice() {
+  if (voiceReady || !hasSpeech) return;
   findRuVoice();
-  if (ruVoice) u.voice = ruVoice;
-  u.lang = 'ru-RU';
-  u.rate = 0.85;
-  u.pitch = 0.9;
-  u.volume = 0.8;
+  // Тихий пустой utterance для разблокировки
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
   speechSynthesis.speak(u);
+  voiceReady = true;
+}
+
+function speak(text) {
+  if (!cfg.voice || !hasSpeech) return;
+  try {
+    speechSynthesis.cancel();
+    setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(text);
+      findRuVoice();
+      if (ruVoice) u.voice = ruVoice;
+      u.lang = 'ru-RU';
+      u.rate = 0.85;
+      u.pitch = 0.9;
+      u.volume = 0.8;
+      speechSynthesis.speak(u);
+    }, 50);
+  } catch(e) {}
 }
 
 function speakCount(sec) {
-  if (!cfg.voice || typeof speechSynthesis === 'undefined') return;
-  const u = new SpeechSynthesisUtterance(String(sec));
-  findRuVoice();
-  if (ruVoice) u.voice = ruVoice;
-  u.lang = 'ru-RU';
-  u.rate = 0.8;
-  u.pitch = 0.85;
-  u.volume = 0.6;
-  speechSynthesis.speak(u);
+  if (!cfg.voice || !hasSpeech) return;
+  try {
+    const u = new SpeechSynthesisUtterance(String(sec));
+    findRuVoice();
+    if (ruVoice) u.voice = ruVoice;
+    u.lang = 'ru-RU';
+    u.rate = 0.8;
+    u.pitch = 0.85;
+    u.volume = 0.6;
+    speechSynthesis.speak(u);
+  } catch(e) {}
 }
 
 function voicePhase(ph, dur) {
@@ -912,7 +934,7 @@ function voicePhase(ph, dur) {
   const isHold = ph.includes('Hold') || ph.includes('hold');
   if (isHold && dur > 3) {
     for (let i = Math.min(dur, 10); i >= 1; i--) {
-      const delay = (dur - i) * 1000 + 600;
+      const delay = (dur - i) * 1000 + 800;
       voiceTimers.push(setTimeout(() => speakCount(i), delay));
     }
   }
@@ -921,7 +943,7 @@ function voicePhase(ph, dur) {
 function clearVoiceTimers() {
   voiceTimers.forEach(t => clearTimeout(t));
   voiceTimers = [];
-  if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  try { if (hasSpeech) speechSynthesis.cancel(); } catch(e) {}
 }
 
 // ─── Background Sound Engine ─────────────────────────────────────────────────
@@ -1143,6 +1165,7 @@ function startRound() {
 
 function startSession() {
   initAudio();
+  initVoice();
   document.getElementById('rt').textContent = cfg.rounds;
   document.getElementById('ct').textContent = cfg.cycles;
   document.getElementById('btn-pause').textContent = 'Пауза';
