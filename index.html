@@ -475,6 +475,14 @@
       </div>
       <button class="mc-start" onclick="event.stopPropagation();startSession()">Начать</button>
     </div>
+    <div class="mc" id="mc-buteyko" onclick="pick('buteyko')">
+      <div class="mc-content">
+        <div class="mc-title">Метод Бутейко</div>
+        <div class="mc-body">Поверхностное дыхание через нос. Снижает гипервентиляцию, нормализует CO₂ в крови. Помогает при астме, панических атаках и хронической усталости.</div>
+        <div class="mc-tags"><span class="tag">Астма</span><span class="tag">Тревога</span><span class="tag">Здоровье</span></div>
+      </div>
+      <button class="mc-start" onclick="event.stopPropagation();startSession()">Начать</button>
+    </div>
     <p class="safety">Не выполняйте в воде, за рулём или в ванной</p>
   </div>
 
@@ -685,9 +693,10 @@ tg?.BackButton?.onClick(() => {
 // ─── Mode selection ───────────────────────────────────────────────────────────
 function pick(m) {
   mode = m;
-  ['wim','box','478'].forEach(k => document.getElementById('mc-' + k).classList.toggle('sel', k === m));
+  ['wim','box','478','buteyko'].forEach(k => document.getElementById('mc-' + k).classList.toggle('sel', k === m));
   if (m === 'box') { cfg.inhale = 4; cfg.exhale = 4; syncSliders(); }
   if (m === '478') { cfg.inhale = 4; cfg.exhale = 8; syncSliders(); }
+  if (m === 'buteyko') { cfg.inhale = 2; cfg.exhale = 4; syncSliders(); }
   haptic('light');
 }
 
@@ -1027,6 +1036,14 @@ function next() {
       if (cycle >= cfg.cycles) { if (round >= cfg.rounds) finish(); else startRound(); }
       else setPhase('inhale', 4);
     }
+  } else if (mode === 'buteyko') {
+    if (curPhase === 'inhale') setPhase('exhale', 4);
+    else if (curPhase === 'exhale') setPhase('boxHoldOut', 4);
+    else if (curPhase === 'boxHoldOut') {
+      cycle++; document.getElementById('cn').textContent = cycle;
+      if (cycle >= cfg.cycles) { if (round >= cfg.rounds) finish(); else startRound(); }
+      else setPhase('inhale', 2);
+    }
   }
 }
 
@@ -1037,7 +1054,8 @@ function startRound() {
   document.getElementById('cn').textContent = 0;
   pb.style.width = '0%';
   if (round > 1) { tone(432, 1, .2); hapticNotif('success'); }
-  setPhase('inhale', mode === 'wim' ? cfg.inhale : 4);
+  const firstInhale = mode === 'wim' ? cfg.inhale : mode === 'buteyko' ? 2 : 4;
+  setPhase('inhale', firstInhale);
 }
 
 function startSession() {
@@ -1088,7 +1106,7 @@ function finish() {
   document.getElementById('cr').textContent = cfg.rounds;
   document.getElementById('ct2').textContent = el;
   document.getElementById('ch').textContent = maxHold ? maxHold + 'с' : '—';
-  const mn = { wim: 'Метод Вима', box: 'Box 4-4-4-4', '478': '4-7-8' };
+  const mn = { wim: 'Метод Вима', box: 'Box 4-4-4-4', '478': '4-7-8', buteyko: 'Бутейко' };
   const entry = { date: new Date(), rounds: cfg.rounds, time: el, hold: maxHold, mode: mn[mode] };
   hist.unshift(entry);
   // Сохраняем историю в CloudStorage (максимум 20 записей)
