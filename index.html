@@ -511,6 +511,11 @@
     </label>
     <div class="srow"><label>Громкость дыхания</label><input type="range" id="s-breathvol" min="10" max="100" step="10" value="60" oninput="cfg.breathVol=+this.value;document.getElementById('v-breathvol').textContent=this.value+'%'"><span class="val" id="v-breathvol">60%</span></div>
     <label class="toggle-row">
+      <span>Голосовой диктор</span>
+      <input type="checkbox" id="voice-cb" onchange="cfg.voice=this.checked">
+      <div class="toggle-switch"></div>
+    </label>
+    <label class="toggle-row">
       <span>Вибрация (haptic)</span>
       <input type="checkbox" id="haptic-cb" checked onchange="cfg.haptic=this.checked">
       <div class="toggle-switch"></div>
@@ -657,7 +662,7 @@ cloudLoad('bf_hist', saved => {
 });
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const cfg = { inhale: 2, exhale: 2, cycles: 30, rounds: 3, sound: true, haptic: true, breathSound: true, breathVol: 60, bgSound: 'none', binaural: 'none', bgVol: 25 };
+const cfg = { inhale: 2, exhale: 2, cycles: 30, rounds: 3, sound: true, haptic: true, breathSound: true, breathVol: 60, voice: false, bgSound: 'none', binaural: 'none', bgVol: 25 };
 let mode = 'wim';
 let curPhase = null, phaseDur = null, phaseStart = null, raf = null;
 let round = 0, cycle = 0, sessStart = null, maxHold = 0;
@@ -727,6 +732,8 @@ function applySettingsToUI() {
   if (bcb) bcb.checked = cfg.breathSound;
   const bvEl = document.getElementById('s-breathvol');
   if (bvEl) { bvEl.value = cfg.breathVol; document.getElementById('v-breathvol').textContent = cfg.breathVol + '%'; }
+  const vcb = document.getElementById('voice-cb');
+  if (vcb) vcb.checked = cfg.voice;
   const hcb = document.getElementById('haptic-cb');
   if (hcb) hcb.checked = cfg.haptic;
   // Background sound pills
@@ -842,6 +849,79 @@ function stopBreathSound() {
     breathNodes = null;
     setTimeout(() => { try { n.source.stop(); } catch(e) {} }, 200);
   } catch(e) { breathNodes = null; }
+}
+
+// ─── Voice Guide ─────────────────────────────────────────────────────────────
+let voiceTimers = [];
+let ruVoice = null;
+
+// Ищем русский голос при загрузке
+function findRuVoice() {
+  if (ruVoice) return;
+  const voices = speechSynthesis.getVoices();
+  ruVoice = voices.find(v => v.lang.startsWith('ru')) || null;
+}
+if (typeof speechSynthesis !== 'undefined') {
+  speechSynthesis.onvoiceschanged = findRuVoice;
+  findRuVoice();
+}
+
+function speak(text) {
+  if (!cfg.voice || typeof speechSynthesis === 'undefined') return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  findRuVoice();
+  if (ruVoice) u.voice = ruVoice;
+  u.lang = 'ru-RU';
+  u.rate = 0.85;
+  u.pitch = 0.9;
+  u.volume = 0.8;
+  speechSynthesis.speak(u);
+}
+
+function speakCount(sec) {
+  if (!cfg.voice || typeof speechSynthesis === 'undefined') return;
+  const u = new SpeechSynthesisUtterance(String(sec));
+  findRuVoice();
+  if (ruVoice) u.voice = ruVoice;
+  u.lang = 'ru-RU';
+  u.rate = 0.8;
+  u.pitch = 0.85;
+  u.volume = 0.6;
+  speechSynthesis.speak(u);
+}
+
+function voicePhase(ph, dur) {
+  clearVoiceTimers();
+  if (!cfg.voice) return;
+
+  const labels = {
+    inhale: 'Вдох',
+    exhale: 'Выдох',
+    exhaleHold: 'Задержка дыхания',
+    inhaleHold: 'Глубокий вдох и задержка',
+    boxHoldIn: 'Задержка',
+    boxHoldOut: 'Задержка',
+    '478hold': 'Задержка',
+  };
+
+  const label = labels[ph];
+  if (label) speak(label);
+
+  // Обратный отсчёт для задержек
+  const isHold = ph.includes('Hold') || ph.includes('hold');
+  if (isHold && dur > 3) {
+    for (let i = Math.min(dur, 10); i >= 1; i--) {
+      const delay = (dur - i) * 1000 + 600;
+      voiceTimers.push(setTimeout(() => speakCount(i), delay));
+    }
+  }
+}
+
+function clearVoiceTimers() {
+  voiceTimers.forEach(t => clearTimeout(t));
+  voiceTimers = [];
+  if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
 }
 
 // ─── Background Sound Engine ─────────────────────────────────────────────────
@@ -984,6 +1064,8 @@ function setPhase(ph, dur) {
   document.getElementById('btn-early').style.display = c.earlyBtn ? 'inline-block' : 'none';
   c.sound();
   c.hapticFn();
+  // Voice guide
+  voicePhase(ph, dur);
   // Breath sounds for inhale/exhale phases
   if (ph === 'inhale') startBreathSound('inhale', dur);
   else if (ph === 'exhale') startBreathSound('exhale', dur);
@@ -1053,7 +1135,8 @@ function startRound() {
   document.getElementById('rn').textContent = round;
   document.getElementById('cn').textContent = 0;
   pb.style.width = '0%';
-  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); }
+  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); speak('Раунд ' + round); }
+  else if (cfg.voice) { speak('Начинаем. Закройте глаза. Дышите через нос.'); }
   const firstInhale = mode === 'wim' ? cfg.inhale : mode === 'buteyko' ? 2 : 4;
   setPhase('inhale', firstInhale);
 }
@@ -1090,6 +1173,7 @@ function skipHold() { phaseDur = 0; }
 
 function abortSession() {
   if (raf) cancelAnimationFrame(raf);
+  clearVoiceTimers();
   stopBreathSound();
   stopBgAudio();
   resetSph(); go('home');
@@ -1097,6 +1181,8 @@ function abortSession() {
 
 function finish() {
   if (raf) cancelAnimationFrame(raf);
+  clearVoiceTimers();
+  speak('Практика завершена. Хорошая работа.');
   stopBreathSound();
   stopBgAudio();
   [0, 280, 560].forEach(d => setTimeout(() => tone(528 + d, .45, .15), d));
