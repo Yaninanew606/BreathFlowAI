@@ -779,44 +779,44 @@ function startBreathSound(type, duration) {
   source.buffer = buf;
   source.loop = true;
 
-  // Highpass to remove rumble
-  const hp = audioCtx.createBiquadFilter();
-  hp.type = 'highpass';
-  hp.frequency.value = 300;
-  hp.Q.value = 0.5;
+  // Мягкое дыхание: узкая полоса высоких частот (как воздух через нос)
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 2.5; // узкая полоса — убирает грубый шум
 
-  // Lowpass to shape breath character
+  // Дополнительное смягчение
   const lp = audioCtx.createBiquadFilter();
   lp.type = 'lowpass';
+  lp.frequency.value = 2500;
+  lp.Q.value = 0.5;
 
   const gain = audioCtx.createGain();
-  const vol = cfg.breathVol / 100 * 0.8;
+  const vol = cfg.breathVol / 100 * 0.4;
   const t = audioCtx.currentTime;
   const d = duration;
 
   if (type === 'inhale') {
-    // Inhale: opening up, pitch rises, volume swells
-    lp.frequency.setValueAtTime(800, t);
-    lp.frequency.linearRampToValueAtTime(4000, t + d);
-    lp.Q.value = 0.3;
-    gain.gain.setValueAtTime(0.01, t);
-    gain.gain.linearRampToValueAtTime(vol, t + d * 0.4);
-    gain.gain.linearRampToValueAtTime(vol * 0.6, t + d * 0.85);
-    gain.gain.linearRampToValueAtTime(0.01, t + d);
+    // Вдох: мягкий шёпот, частота плавно поднимается
+    bp.frequency.setValueAtTime(1200, t);
+    bp.frequency.linearRampToValueAtTime(2000, t + d);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(vol * 0.5, t + d * 0.2);
+    gain.gain.linearRampToValueAtTime(vol, t + d * 0.5);
+    gain.gain.linearRampToValueAtTime(vol * 0.4, t + d * 0.85);
+    gain.gain.linearRampToValueAtTime(0.001, t + d);
   } else {
-    // Exhale: closing down, pitch falls, volume fades
-    lp.frequency.setValueAtTime(3500, t);
-    lp.frequency.linearRampToValueAtTime(600, t + d);
-    lp.Q.value = 0.3;
-    gain.gain.setValueAtTime(0.01, t);
-    gain.gain.linearRampToValueAtTime(vol * 0.9, t + d * 0.1);
-    gain.gain.linearRampToValueAtTime(vol * 0.7, t + d * 0.4);
-    gain.gain.linearRampToValueAtTime(vol * 0.2, t + d * 0.8);
-    gain.gain.linearRampToValueAtTime(0.01, t + d);
+    // Выдох: тёплый мягкий поток, частота опускается
+    bp.frequency.setValueAtTime(1800, t);
+    bp.frequency.linearRampToValueAtTime(900, t + d);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(vol * 0.8, t + d * 0.08);
+    gain.gain.linearRampToValueAtTime(vol * 0.6, t + d * 0.3);
+    gain.gain.linearRampToValueAtTime(vol * 0.15, t + d * 0.75);
+    gain.gain.linearRampToValueAtTime(0.001, t + d);
   }
 
-  source.connect(hp);
-  hp.connect(lp);
+  source.connect(bp);
+  bp.connect(lp);
   lp.connect(gain);
   gain.connect(audioCtx.destination);
   source.start();
