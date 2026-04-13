@@ -558,6 +558,7 @@
       <div>Раунд <strong id="rn">1</strong> / <strong id="rt">3</strong></div>
       <div>Цикл <strong id="cn">0</strong> / <strong id="ct">30</strong></div>
     </div>
+    <div id="voice-hint" style="font-size:15px;font-weight:600;color:var(--text2);text-align:center;min-height:22px;transition:opacity 0.5s;opacity:0;margin-bottom:8px"></div>
     <div id="sphere-wrap">
       <div id="sphere-ring"></div>
       <div id="sphere">
@@ -863,65 +864,55 @@ function stopBreathSound() {
   } catch(e) { breathNodes = null; }
 }
 
-// ─── Voice Guide ─────────────────────────────────────────────────────────────
+// ─── Voice Guide (visual + audio cues) ───────────────────────────────────────
 let voiceTimers = [];
-let ruVoice = null;
-let voiceReady = false;
 
-const hasSpeech = typeof speechSynthesis !== 'undefined';
+function initVoice() {} // совместимость
 
-function findRuVoice() {
-  if (!hasSpeech) return;
-  const voices = speechSynthesis.getVoices();
-  // Предпочитаем женский русский голос
-  ruVoice = voices.find(v => v.lang === 'ru-RU')
-         || voices.find(v => v.lang.startsWith('ru'))
-         || null;
-}
-if (hasSpeech) {
-  speechSynthesis.onvoiceschanged = findRuVoice;
-  findRuVoice();
+// Текстовая подсказка на экране
+function showGuide(text) {
+  const el = document.getElementById('voice-hint');
+  if (!el) return;
+  el.textContent = text;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
-// Разблокировка Speech Synthesis по жесту пользователя
-function initVoice() {
-  if (voiceReady || !hasSpeech) return;
-  findRuVoice();
-  // Тихий пустой utterance для разблокировки
-  const u = new SpeechSynthesisUtterance('');
-  u.volume = 0;
-  speechSynthesis.speak(u);
-  voiceReady = true;
-}
-
-function speak(text) {
-  if (!cfg.voice || !hasSpeech) return;
+// Мелодичный сигнал фазы (мягкий колокольчик)
+function voiceTone(freq, freq2) {
+  if (!audioCtx || !cfg.voice) return;
   try {
-    speechSynthesis.cancel();
-    setTimeout(() => {
-      const u = new SpeechSynthesisUtterance(text);
-      findRuVoice();
-      if (ruVoice) u.voice = ruVoice;
-      u.lang = 'ru-RU';
-      u.rate = 0.85;
-      u.pitch = 0.9;
-      u.volume = 0.8;
-      speechSynthesis.speak(u);
-    }, 50);
+    const t = audioCtx.currentTime;
+    const o1 = audioCtx.createOscillator();
+    const o2 = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o1.type = 'sine'; o1.frequency.value = freq;
+    o2.type = 'sine'; o2.frequency.value = freq2;
+    o1.connect(g); o2.connect(g);
+    g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.08);
+    g.gain.linearRampToValueAtTime(0.1, t + 0.3);
+    g.gain.linearRampToValueAtTime(0, t + 1.2);
+    o1.start(t); o1.stop(t + 1.3);
+    o2.start(t); o2.stop(t + 1.3);
   } catch(e) {}
 }
 
-function speakCount(sec) {
-  if (!cfg.voice || !hasSpeech) return;
+// Тик обратного отсчёта (понижающийся тон)
+function countTick(sec, total) {
+  if (!audioCtx || !cfg.voice) return;
   try {
-    const u = new SpeechSynthesisUtterance(String(sec));
-    findRuVoice();
-    if (ruVoice) u.voice = ruVoice;
-    u.lang = 'ru-RU';
-    u.rate = 0.8;
-    u.pitch = 0.85;
-    u.volume = 0.6;
-    speechSynthesis.speak(u);
+    const t = audioCtx.currentTime;
+    const freq = 600 + (sec / total) * 400; // выше в начале, ниже к концу
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.03);
+    g.gain.linearRampToValueAtTime(0, t + 0.35);
+    o.start(t); o.stop(t + 0.4);
   } catch(e) {}
 }
 
@@ -929,25 +920,28 @@ function voicePhase(ph, dur) {
   clearVoiceTimers();
   if (!cfg.voice) return;
 
-  const labels = {
-    inhale: 'Вдох',
-    exhale: 'Выдох',
-    exhaleHold: 'Задержка дыхания',
-    inhaleHold: 'Глубокий вдох и задержка',
-    boxHoldIn: 'Задержка',
-    boxHoldOut: 'Задержка',
-    '478hold': 'Задержка',
+  const cues = {
+    inhale:     { text: 'Вдох',                f1: 523, f2: 659 },  // До + Ми (мажор)
+    exhale:     { text: 'Выдох',               f1: 440, f2: 523 },  // Ля + До
+    exhaleHold: { text: 'Задержка — не дышите', f1: 349, f2: 523 },  // Фа + До
+    inhaleHold: { text: 'Вдох и задержка',     f1: 523, f2: 784 },  // До + Соль
+    boxHoldIn:  { text: 'Задержка',            f1: 349, f2: 523 },
+    boxHoldOut: { text: 'Задержка',            f1: 349, f2: 523 },
+    '478hold':  { text: 'Задержка',            f1: 349, f2: 523 },
   };
 
-  const label = labels[ph];
-  if (label) speak(label);
+  const cue = cues[ph];
+  if (!cue) return;
 
-  // Обратный отсчёт для задержек
+  showGuide(cue.text);
+  voiceTone(cue.f1, cue.f2);
+
+  // Обратный отсчёт на задержках
   const isHold = ph.includes('Hold') || ph.includes('hold');
   if (isHold && dur > 3) {
-    for (let i = Math.min(dur, 10); i >= 1; i--) {
-      const delay = (dur - i) * 1000 + 800;
-      voiceTimers.push(setTimeout(() => speakCount(i), delay));
+    for (let i = dur; i >= 1; i--) {
+      const delay = (dur - i) * 1000 + 500;
+      voiceTimers.push(setTimeout(() => countTick(i, dur), delay));
     }
   }
 }
@@ -955,7 +949,6 @@ function voicePhase(ph, dur) {
 function clearVoiceTimers() {
   voiceTimers.forEach(t => clearTimeout(t));
   voiceTimers = [];
-  try { if (hasSpeech) speechSynthesis.cancel(); } catch(e) {}
 }
 
 // ─── Background Sound Engine ─────────────────────────────────────────────────
@@ -1169,8 +1162,8 @@ function startRound() {
   document.getElementById('rn').textContent = round;
   document.getElementById('cn').textContent = 0;
   pb.style.width = '0%';
-  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); speak('Раунд ' + round); }
-  else if (cfg.voice) { speak('Начинаем. Закройте глаза. Дышите через нос.'); }
+  if (round > 1) { tone(432, 1, .2); hapticNotif('success'); showGuide('Раунд ' + round); }
+  else if (cfg.voice) { showGuide('Закройте глаза и дышите'); }
   const firstInhale = mode === 'wim' ? cfg.inhale : mode === 'buteyko' ? 2 : 4;
   setPhase('inhale', firstInhale);
 }
@@ -1217,7 +1210,7 @@ function abortSession() {
 function finish() {
   if (raf) cancelAnimationFrame(raf);
   clearVoiceTimers();
-  speak('Практика завершена. Хорошая работа.');
+  if (cfg.voice) voiceTone(523, 784);
   stopBreathSound();
   stopBgAudio();
   [0, 280, 560].forEach(d => setTimeout(() => tone(528 + d, .45, .15), d));
