@@ -461,7 +461,7 @@
     </div>
     <div class="mc" id="mc-box" onclick="pick('box')">
       <div class="mc-content">
-        <div class="mc-title">Box breathing 4-4-4-4</div>
+        <div class="mc-title">Квадратное дыхание 4-4-4-4</div>
         <div class="mc-body">Активирует парасимпатическую нервную систему. Снижает кортизол, нормализует давление и пульс. Применяется спецназом для управления стрессом в бою.</div>
         <div class="mc-tags"><span class="tag">Стресс</span><span class="tag">Давление</span><span class="tag">Фокус</span></div>
       </div>
@@ -1106,7 +1106,7 @@ function finish() {
   document.getElementById('cr').textContent = cfg.rounds;
   document.getElementById('ct2').textContent = el;
   document.getElementById('ch').textContent = maxHold ? maxHold + 'с' : '—';
-  const mn = { wim: 'Метод Вима', box: 'Box 4-4-4-4', '478': '4-7-8', buteyko: 'Бутейко' };
+  const mn = { wim: 'Метод Вима', box: 'Квадратное 4-4-4-4', '478': '4-7-8', buteyko: 'Бутейко' };
   const entry = { date: new Date(), rounds: cfg.rounds, time: el, hold: maxHold, mode: mn[mode] };
   hist.unshift(entry);
   // Сохраняем историю в CloudStorage (максимум 20 записей)
